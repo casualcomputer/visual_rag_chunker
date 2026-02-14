@@ -26,6 +26,15 @@ class ChunkingParams:
         clustering_min: int = 100,
         num_clusters: Optional[int] = None,
         llm_max: int = 600,
+        code_chunk_size: int = 800,
+        code_chunk_overlap: int = 50,
+        json_max_chunk_size: int = 400,
+        llama_sentence_size: int = 1024,
+        llama_sentence_overlap: int = 20,
+        llama_sentence_window_size: int = 3,
+        llama_hierarchical_large: int = 512,
+        llama_hierarchical_medium: int = 256,
+        llama_hierarchical_small: int = 128,
         **kwargs: Any,
     ):
         self.character_size = character_size
@@ -41,6 +50,15 @@ class ChunkingParams:
         self.clustering_min = clustering_min
         self.num_clusters = num_clusters
         self.llm_max = llm_max
+        self.code_chunk_size = code_chunk_size
+        self.code_chunk_overlap = code_chunk_overlap
+        self.json_max_chunk_size = json_max_chunk_size
+        self.llama_sentence_size = llama_sentence_size
+        self.llama_sentence_overlap = llama_sentence_overlap
+        self.llama_sentence_window_size = llama_sentence_window_size
+        self.llama_hierarchical_large = llama_hierarchical_large
+        self.llama_hierarchical_medium = llama_hierarchical_medium
+        self.llama_hierarchical_small = llama_hierarchical_small
 
     @classmethod
     def from_request(cls, data: dict) -> "ChunkingParams":
@@ -58,6 +76,15 @@ class ChunkingParams:
             clustering_min=data.get("clusteringMin", 100),
             num_clusters=data.get("numClusters"),
             llm_max=data.get("llmMax", 600),
+            code_chunk_size=data.get("codeChunkSize", 800),
+            code_chunk_overlap=data.get("codeChunkOverlap", 50),
+            json_max_chunk_size=data.get("jsonMaxChunkSize", 400),
+            llama_sentence_size=data.get("llamaSentenceSize", 1024),
+            llama_sentence_overlap=data.get("llamaSentenceOverlap", 20),
+            llama_sentence_window_size=data.get("llamaSentenceWindowSize", 3),
+            llama_hierarchical_large=data.get("llamaHierarchicalLarge", 512),
+            llama_hierarchical_medium=data.get("llamaHierarchicalMedium", 256),
+            llama_hierarchical_small=data.get("llamaHierarchicalSmall", 128),
         )
 
 

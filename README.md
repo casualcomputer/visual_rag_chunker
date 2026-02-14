@@ -20,6 +20,15 @@ This is the primary user-facing project documentation. Agent-oriented implementa
   4. **Semantic Chunking** – Sentence embeddings + similarity threshold.
   5. **Clustering (CRAG-style)** – Sentence embeddings + KMeans (contiguous output chunks).
   6. **LLM-based (Agent assisted)** – Paragraph-based proxy (real version would use an API).
+  7. **HTML Header Splitter (LangChain)** – Splits HTML by header hierarchy.
+  8. **Markdown Header Splitter (LangChain)** – Splits Markdown by `#` / `##` / `###`.
+  9. **Code Splitter (LangChain)** – Code-aware recursive splitting.
+  10. **Recursive JSON Splitter (LangChain)** – Splits nested JSON structures.
+  11. **Markdown Node Parser (LlamaIndex)** – Parses Markdown into nodes.
+  12. **HTML Node Parser (LlamaIndex)** – Parses HTML elements into nodes.
+  13. **Sentence Splitter (LlamaIndex)** – Sentence-aware chunking with overlap.
+  14. **Sentence Window Parser (LlamaIndex)** – Sentence chunks with windowed context.
+  15. **Hierarchical Node Parser (LlamaIndex)** – Multi-level chunking (leaf nodes returned).
 
 - **Per-algorithm params** – Chunk size, overlap, and limits where applicable.
 - **Visual chunks** – Chunks listed as cards; click a chunk to highlight its region in the document.
@@ -70,13 +79,6 @@ npm run preview
 
 - Put your own `.md` files in `data/` and use **Upload .md** to open them, or use **Load sample** to use the bundled sample.
 
-## Additional methods from LanceDB LangChain/LlamaIndex article
+## Article coverage
 
-The second LanceDB article also covers chunking/parser approaches that are not implemented in this repo yet, including:
-
-- HTML/header-aware splitting
-- JSON-aware recursive splitting
-- Code-aware splitting
-- Markdown/HTML node parsers (LlamaIndex)
-- Sentence splitter (LlamaIndex)
-- Hierarchical node parser (LlamaIndex)
+Methods from both LanceDB articles are implemented in the backend and available in the UI selector.

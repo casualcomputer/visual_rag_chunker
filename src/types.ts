@@ -11,7 +11,16 @@ export type ChunkingAlgorithmId =
   | 'token'
   | 'semantic'
   | 'clustering'
-  | 'llm';
+  | 'llm'
+  | 'htmlHeader'
+  | 'markdownHeader'
+  | 'code'
+  | 'recursiveJson'
+  | 'llamaMarkdownNode'
+  | 'llamaHtmlNode'
+  | 'llamaSentence'
+  | 'llamaSentenceWindow'
+  | 'llamaHierarchical';
 
 export interface ChunkingOption {
   id: ChunkingAlgorithmId;

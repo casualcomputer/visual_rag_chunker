@@ -1,16 +1,23 @@
 """
 Chunking algorithms as in the LanceDB blog:
 https://lancedb.com/blog/chunking-analysis-which-is-the-right-chunking-approach-for-your-language/
+and:
+https://lancedb.com/blog/chunking-techniques-with-langchain-and-llamaindex/
 """
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING
 
 from langchain_text_splitters import (
     CharacterTextSplitter,
+    HTMLHeaderTextSplitter,
+    MarkdownHeaderTextSplitter,
     RecursiveCharacterTextSplitter,
+    RecursiveJsonSplitter,
 )
 from langchain_text_splitters import TokenTextSplitter  # uses tiktoken
+from langchain_text_splitters.base import Language
 
 from .schemas import ChunkingParams, chunks_with_offsets
 
@@ -240,3 +247,128 @@ def llm_split(text: str, params: ChunkingParams) -> list[dict]:
     if current:
         chunk_texts.append("\n\n".join(current))
     return chunks_with_offsets(text, chunk_texts)
+
+
+def html_header_split(text: str, params: ChunkingParams) -> list[dict]:
+    """LangChain HTML header-based splitting (article)."""
+    splitter = HTMLHeaderTextSplitter(
+        headers_to_split_on=[("h1", "Header 1"), ("h2", "Header 2"), ("h3", "Header 3")]
+    )
+    docs = splitter.split_text(text)
+    chunks = [doc.page_content for doc in docs if doc.page_content.strip()]
+    return chunks_with_offsets(text, chunks)
+
+
+def markdown_header_split(text: str, params: ChunkingParams) -> list[dict]:
+    """LangChain Markdown header-based splitting (#, ##, ###)."""
+    splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=[("#", "Header 1"), ("##", "Header 2"), ("###", "Header 3")],
+        strip_headers=False,
+    )
+    docs = splitter.split_text(text)
+    chunks = [doc.page_content for doc in docs if doc.page_content.strip()]
+    return chunks_with_offsets(text, chunks)
+
+
+def code_split(text: str, params: ChunkingParams) -> list[dict]:
+    """LangChain code-aware splitting (article)."""
+    splitter = RecursiveCharacterTextSplitter.from_language(
+        language=Language.MARKDOWN,
+        chunk_size=params.code_chunk_size,
+        chunk_overlap=params.code_chunk_overlap,
+    )
+    chunks = splitter.split_text(text)
+    return chunks_with_offsets(text, chunks)
+
+
+def recursive_json_split(text: str, params: ChunkingParams) -> list[dict]:
+    """LangChain recursive JSON splitting (article)."""
+    splitter = RecursiveJsonSplitter(max_chunk_size=params.json_max_chunk_size)
+    try:
+        json_obj = json.loads(text)
+    except json.JSONDecodeError:
+        json_obj = {"text": text}
+    chunks = splitter.split_text(json_data=json_obj)
+    if isinstance(chunks, list):
+        chunk_texts = [
+            chunk if isinstance(chunk, str) else json.dumps(chunk, ensure_ascii=True)
+            for chunk in chunks
+        ]
+    else:
+        chunk_texts = [text]
+    return chunks_with_offsets(text, chunk_texts)
+
+
+def _llama_nodes_to_chunks(text: str, nodes: list) -> list[dict]:
+    chunk_texts: list[str] = []
+    for node in nodes:
+        node_text = getattr(node, "text", None)
+        if not node_text and hasattr(node, "get_content"):
+            node_text = node.get_content()
+        if node_text and node_text.strip():
+            chunk_texts.append(node_text)
+    return chunks_with_offsets(text, chunk_texts)
+
+
+def llama_markdown_node_split(text: str, params: ChunkingParams) -> list[dict]:
+    """LlamaIndex Markdown node parsing (article)."""
+    from llama_index.core import Document
+    from llama_index.core.node_parser import MarkdownNodeParser
+
+    parser = MarkdownNodeParser()
+    nodes = parser.get_nodes_from_documents([Document(text=text)])
+    return _llama_nodes_to_chunks(text, nodes)
+
+
+def llama_html_node_split(text: str, params: ChunkingParams) -> list[dict]:
+    """LlamaIndex HTML node parsing (article)."""
+    from llama_index.core import Document
+    from llama_index.core.node_parser import HTMLNodeParser
+
+    parser = HTMLNodeParser(tags=["p", "h1", "h2", "h3", "h4", "h5", "h6", "li"])
+    nodes = parser.get_nodes_from_documents([Document(text=text)])
+    return _llama_nodes_to_chunks(text, nodes)
+
+
+def llama_sentence_split(text: str, params: ChunkingParams) -> list[dict]:
+    """LlamaIndex sentence splitting (article)."""
+    from llama_index.core import Document
+    from llama_index.core.node_parser import SentenceSplitter
+
+    parser = SentenceSplitter(
+        chunk_size=params.llama_sentence_size,
+        chunk_overlap=params.llama_sentence_overlap,
+    )
+    nodes = parser.get_nodes_from_documents([Document(text=text)])
+    return _llama_nodes_to_chunks(text, nodes)
+
+
+def llama_sentence_window_split(text: str, params: ChunkingParams) -> list[dict]:
+    """LlamaIndex sentence-window node parsing (article)."""
+    from llama_index.core import Document
+    from llama_index.core.node_parser import SentenceWindowNodeParser
+
+    parser = SentenceWindowNodeParser.from_defaults(
+        window_size=params.llama_sentence_window_size
+    )
+    nodes = parser.get_nodes_from_documents([Document(text=text)])
+    return _llama_nodes_to_chunks(text, nodes)
+
+
+def llama_hierarchical_split(text: str, params: ChunkingParams) -> list[dict]:
+    """LlamaIndex hierarchical node parsing (article)."""
+    from llama_index.core import Document
+    from llama_index.core.node_parser import HierarchicalNodeParser
+
+    parser = HierarchicalNodeParser.from_defaults(
+        chunk_sizes=[
+            params.llama_hierarchical_large,
+            params.llama_hierarchical_medium,
+            params.llama_hierarchical_small,
+        ]
+    )
+    all_nodes = parser.get_nodes_from_documents([Document(text=text)])
+    nodes = [node for node in all_nodes if not getattr(node, "child_nodes", None)]
+    if not nodes:
+        nodes = all_nodes
+    return _llama_nodes_to_chunks(text, nodes)

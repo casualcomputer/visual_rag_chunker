@@ -16,6 +16,15 @@ User-facing setup and product documentation lives in `README.md`.
 - `semantic` -> sentence embeddings + similarity-threshold grouping
 - `clustering` -> sentence embeddings + KMeans clustering (contiguous output)
 - `llm` -> paragraph-based proxy for agent/LLM chunking
+- `htmlHeader` -> LangChain `HTMLHeaderTextSplitter`
+- `markdownHeader` -> LangChain `MarkdownHeaderTextSplitter` (`#`, `##`, `###`)
+- `code` -> LangChain code-aware recursive splitter
+- `recursiveJson` -> LangChain `RecursiveJsonSplitter`
+- `llamaMarkdownNode` -> LlamaIndex `MarkdownNodeParser`
+- `llamaHtmlNode` -> LlamaIndex `HTMLNodeParser`
+- `llamaSentence` -> LlamaIndex `SentenceSplitter`
+- `llamaSentenceWindow` -> LlamaIndex `SentenceWindowNodeParser`
+- `llamaHierarchical` -> LlamaIndex `HierarchicalNodeParser` (leaf nodes)
 
 See:
 - `backend/chunking/runner.py`

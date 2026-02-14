@@ -16,4 +16,13 @@ export type ChunkingParams = {
   clusteringMin?: number;
   numClusters?: number;
   llmMax?: number;
+  codeChunkSize?: number;
+  codeChunkOverlap?: number;
+  jsonMaxChunkSize?: number;
+  llamaSentenceSize?: number;
+  llamaSentenceOverlap?: number;
+  llamaSentenceWindowSize?: number;
+  llamaHierarchicalLarge?: number;
+  llamaHierarchicalMedium?: number;
+  llamaHierarchicalSmall?: number;
 };
