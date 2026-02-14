@@ -310,6 +310,127 @@ def _llama_nodes_to_chunks(text: str, nodes: list) -> list[dict]:
     return chunks_with_offsets(text, chunk_texts)
 
 
+def _find_line_in_text(text: str, line: str, search_from: int) -> int:
+    """Find a line in text, returning its start position or -1."""
+    stripped = line.strip()
+    if not stripped:
+        return -1
+    return text.find(stripped, search_from)
+
+
+def _find_chunk_offsets(
+    text: str, chunk_text: str, search_from: int
+) -> tuple[int, int]:
+    """Find where a chunk's content appears in the original text.
+
+    Handles cases where chunk_text has been transformed (e.g. ## headers
+    stripped by MarkdownElementNodeParser). Falls back to line-by-line
+    matching and expands to full line boundaries in the original text.
+    """
+    # Line-by-line matching: find first and last non-empty lines
+    # Always expand to line boundaries so stripped prefixes (## etc.) are included.
+    lines = [l for l in chunk_text.split("\n") if l.strip()]
+    if not lines:
+        return search_from, search_from
+
+    # Find the first content line in original text
+    first_pos = _find_line_in_text(text, lines[0], search_from)
+    if first_pos == -1:
+        return search_from, search_from + len(chunk_text)
+
+    # Expand start to the beginning of that line (to include ## prefix etc.)
+    start = first_pos
+    while start > 0 and text[start - 1] != "\n":
+        start -= 1
+
+    # Find the last content line
+    if len(lines) > 1:
+        last_pos = _find_line_in_text(text, lines[-1], first_pos)
+        if last_pos == -1:
+            last_pos = first_pos
+        end = last_pos + len(lines[-1].strip())
+    else:
+        end = first_pos + len(lines[0].strip())
+
+    # Expand end past trailing whitespace/newlines up to the next content
+    while end < len(text) and text[end] in " \t":
+        end += 1
+    if end < len(text) and text[end] == "\n":
+        end += 1
+
+    return start, end
+
+
+def element_split(text: str, params: ChunkingParams) -> list[dict]:
+    """LlamaIndex MarkdownElementNodeParser: keeps tables/lists/code blocks intact.
+
+    Matches the approach from generate_goldens.py:
+    1. Split by markdown headers first (preserves section context)
+    2. For each section, extract structural elements (tables, lists, code blocks)
+    3. Convert table elements to their HTML representation
+
+    Offsets are computed by finding each element's content lines in the
+    original text, expanding to line boundaries to handle stripped markdown
+    formatting (e.g. ## headers removed by extract_elements).
+    """
+    from llama_index.core.node_parser import MarkdownElementNodeParser
+
+    header_splitter = MarkdownHeaderTextSplitter(
+        headers_to_split_on=[("#", "h1"), ("##", "h2"), ("###", "h3"), ("####", "h4")],
+        strip_headers=False,
+    )
+    section_docs = header_splitter.split_text(text)
+
+    element_parser = MarkdownElementNodeParser()
+    result: list[dict] = []
+    chunk_index = 0
+    doc_cursor = 0  # track position across sections
+
+    for section_doc in section_docs:
+        section_text = section_doc.page_content.strip()
+        if not section_text:
+            continue
+
+        # Find where this section starts by its first line (header)
+        first_line = section_text.split("\n", 1)[0].strip()
+        section_start = text.find(first_line, doc_cursor)
+        if section_start == -1:
+            section_start = doc_cursor
+
+        elements = element_parser.extract_elements(
+            section_text, table_filters=[element_parser.filter_table]
+        )
+        elements = element_parser.extract_html_tables(elements)
+        if not elements:
+            doc_cursor = section_start + len(first_line)
+            continue
+
+        el_cursor = section_start
+        for el in elements:
+            chunk_text = str(el.element).strip()
+            if not chunk_text:
+                continue
+
+            start, end = _find_chunk_offsets(text, chunk_text, el_cursor)
+
+            # Use the original text at the computed offsets so that
+            # markdown formatting (## headers etc.) is preserved in display.
+            display_text = text[start:end].strip() or chunk_text
+
+            result.append({
+                "index": chunk_index,
+                "text": display_text,
+                "startOffset": start,
+                "endOffset": end,
+            })
+            chunk_index += 1
+            el_cursor = end
+
+        doc_cursor = el_cursor
+
+    return result
+
+
 def llama_markdown_node_split(text: str, params: ChunkingParams) -> list[dict]:
     """LlamaIndex Markdown node parsing (article)."""
     from llama_index.core import Document

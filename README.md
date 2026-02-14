@@ -79,6 +79,17 @@ npm run preview
 
 - Put your own `.md` files in `data/` and use **Upload .md** to open them, or use **Load sample** to use the bundled sample.
 
+## Testing
+
+From the `backend/` directory:
+
+```bash
+uv run python -m pytest tests/ -v              # fast tests only (~5s)
+uv run python -m pytest tests/ -v --slow       # all tests including semantic & clustering (~40s)
+```
+
+The `--slow` flag enables tests that download the `paraphrase-multilingual-MiniLM-L12-v2` sentence-transformer model.
+
 ## Article coverage
 
 Methods from both LanceDB articles are implemented in the backend and available in the UI selector.

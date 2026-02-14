@@ -16,6 +16,7 @@ export type ChunkingAlgorithmId =
   | 'markdownHeader'
   | 'code'
   | 'recursiveJson'
+  | 'llamaMarkdownElement'
   | 'llamaMarkdownNode'
   | 'llamaHtmlNode'
   | 'llamaSentence'
@@ -26,5 +27,6 @@ export interface ChunkingOption {
   id: ChunkingAlgorithmId;
   label: string;
   description: string;
+  group: string;
   params?: { key: string; label: string; default: number; min?: number; max?: number }[];
 }

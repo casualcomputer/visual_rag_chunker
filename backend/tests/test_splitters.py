@@ -17,6 +17,7 @@ from chunking.splitters import (
     recursive_split,
     semantic_split,
     token_split,
+    element_split,
     llama_markdown_node_split,
     llama_html_node_split,
     llama_sentence_split,
@@ -427,6 +428,22 @@ class TestLlamaHierarchicalSplit:
         # Leaf nodes should be smaller than the large chunk size
         for c in chunks:
             assert len(c["text"]) <= 600  # some tolerance above 512
+
+
+# ===========================================================================
+# 16. LlamaIndex Markdown Element Parser
+# ===========================================================================
+
+class TestLlamaMarkdownElementSplit:
+    def test_basic(self):
+        chunks = element_split(SAMPLE_TEXT, default_params())
+        assert_valid_chunks(chunks, SAMPLE_TEXT)
+        assert len(chunks) >= 1
+
+    def test_table_kept_intact(self):
+        md_with_table = "# Section\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nSome prose.\n"
+        chunks = element_split(md_with_table, default_params())
+        assert any("|" in c["text"] for c in chunks), "Table should appear as a chunk"
 
 
 # ===========================================================================

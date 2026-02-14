@@ -280,12 +280,23 @@ function init(): void {
 
   loadSample.addEventListener('click', () => setText(sampleMd));
 
+  const groups = new Map<string, typeof CHUNKING_OPTIONS>();
   CHUNKING_OPTIONS.forEach((opt) => {
-    const option = document.createElement('option');
-    option.value = opt.id;
-    option.textContent = opt.label;
-    if (opt.id === currentAlgorithmId) option.selected = true;
-    algorithmSelect.appendChild(option);
+    const g = opt.group ?? 'Other';
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g)!.push(opt);
+  });
+  groups.forEach((opts, groupName) => {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = groupName;
+    opts.forEach((opt) => {
+      const option = document.createElement('option');
+      option.value = opt.id;
+      option.textContent = opt.label;
+      if (opt.id === currentAlgorithmId) option.selected = true;
+      optgroup.appendChild(option);
+    });
+    algorithmSelect.appendChild(optgroup);
   });
 
   algorithmSelect.addEventListener('change', () => {
