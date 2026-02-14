@@ -1,0 +1,19 @@
+/**
+ * Chunking is performed by the Python backend (LanceDB blog algorithms).
+ * This module only exports the params type for the UI.
+ */
+export type ChunkingParams = {
+  characterSize?: number;
+  characterOverlap?: number;
+  recursiveSize?: number;
+  recursiveOverlap?: number;
+  tokenSize?: number;
+  tokenOverlap?: number;
+  semanticMax?: number;
+  semanticMin?: number;
+  semanticPercentile?: number;
+  clusteringMax?: number;
+  clusteringMin?: number;
+  numClusters?: number;
+  llmMax?: number;
+};
