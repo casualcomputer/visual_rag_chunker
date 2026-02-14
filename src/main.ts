@@ -15,6 +15,8 @@ let activeChunkIndex: number | null = null;
 let isDocumentCompact = true;
 const params: ChunkingParams = {};
 let apiError: string | null = null;
+let chunkRequestSeq = 0;
+let inFlightChunkRequest: AbortController | null = null;
 
 function applyDocumentMode(): void {
   app.classList.toggle('doc-compact', isDocumentCompact);
@@ -22,6 +24,32 @@ function applyDocumentMode(): void {
   if (toggleBtn) {
     toggleBtn.textContent = isDocumentCompact ? 'Expand document' : 'Compact document';
   }
+}
+
+function setChunkingState(loading: boolean): void {
+  app.classList.toggle('is-loading', loading);
+
+  const summary = document.getElementById('chunk-summary');
+  if (summary) {
+    summary.classList.toggle('loading', loading);
+    if (loading) summary.textContent = 'Chunking…';
+  }
+
+  const algorithm = document.getElementById('algorithm') as HTMLSelectElement | null;
+  if (algorithm) algorithm.disabled = loading;
+
+  const fileInput = document.getElementById('file-input') as HTMLInputElement | null;
+  if (fileInput) fileInput.disabled = loading;
+
+  const loadSampleBtn = document.getElementById('load-sample') as HTMLButtonElement | null;
+  if (loadSampleBtn) loadSampleBtn.disabled = loading;
+
+  const toggleSizeBtn = document.getElementById('toggle-document-size') as HTMLButtonElement | null;
+  if (toggleSizeBtn) toggleSizeBtn.disabled = loading;
+
+  document.querySelectorAll('#params input').forEach((el) => {
+    (el as HTMLInputElement).disabled = loading;
+  });
 }
 
 function getDefaultParams(algorithmId: string): Record<string, number> {
@@ -56,7 +84,14 @@ function renderParamInputs(algorithmId: string): void {
 }
 
 async function updateChunks(): Promise<void> {
+  const requestSeq = ++chunkRequestSeq;
+
+  inFlightChunkRequest?.abort();
+  const controller = new AbortController();
+  inFlightChunkRequest = controller;
+
   if (!currentText) {
+    setChunkingState(false);
     currentChunks = [];
     apiError = null;
     renderChunks();
@@ -64,10 +99,9 @@ async function updateChunks(): Promise<void> {
     renderApiError();
     return;
   }
+  setChunkingState(true);
   apiError = null;
   renderApiError();
-  const summaryEl = document.getElementById('chunk-summary');
-  if (summaryEl) summaryEl.textContent = 'Chunking…';
   try {
     const reqParams: Record<string, number> = {};
     CHUNKING_OPTIONS.find((o) => o.id === currentAlgorithmId)?.params?.forEach((p) => {
@@ -77,21 +111,33 @@ async function updateChunks(): Promise<void> {
     const res = await fetch(`${API_BASE}/chunk`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         text: currentText,
         algorithm: currentAlgorithmId,
         params: reqParams,
       }),
     });
+    if (requestSeq !== chunkRequestSeq) return;
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: res.statusText }));
       throw new Error(err.detail || res.statusText);
     }
     const data = await res.json();
+    if (requestSeq !== chunkRequestSeq) return;
     currentChunks = Array.isArray(data.chunks) ? data.chunks : [];
   } catch (e) {
+    if (e instanceof DOMException && e.name === 'AbortError') return;
+    if (requestSeq !== chunkRequestSeq) return;
     apiError = e instanceof Error ? e.message : 'Backend unavailable. Start the Python server (see README).';
     currentChunks = [];
+  } finally {
+    if (requestSeq === chunkRequestSeq && inFlightChunkRequest === controller) {
+      inFlightChunkRequest = null;
+    }
+    if (requestSeq === chunkRequestSeq) {
+      setChunkingState(false);
+    }
   }
   renderChunks();
   renderSourceHighlight();
