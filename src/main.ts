@@ -169,14 +169,14 @@ function renderChunks(): void {
   list.innerHTML = '';
   currentChunks.forEach((chunk) => {
     const card = document.createElement('div');
-    card.className = 'chunk-card';
+    card.className = `chunk-card chunk-card-color-${chunk.index % 8}`;
     card.dataset.index = String(chunk.index);
     const title = document.createElement('div');
     title.className = 'chunk-title';
     title.textContent = `Chunk ${chunk.index + 1}`;
     const meta = document.createElement('div');
     meta.className = 'chunk-meta';
-    meta.textContent = `${chunk.text.length} chars · #${chunk.index + 1}`;
+    meta.textContent = `${chunk.text.length} chars · offset ${chunk.startOffset}–${chunk.endOffset}`;
     const body = document.createElement('pre');
     body.className = 'chunk-body';
     body.textContent = chunk.text.slice(0, 400) + (chunk.text.length > 400 ? '…' : '');
@@ -195,7 +195,8 @@ function renderChunks(): void {
 function highlightChunk(index: number): void {
   activeChunkIndex = index;
   document.querySelectorAll('.chunk-card').forEach((el) => el.classList.remove('active'));
-  document.querySelector(`.chunk-card[data-index="${index}"]`)?.classList.add('active');
+  const activeCard = document.querySelector(`.chunk-card[data-index="${index}"]`);
+  activeCard?.classList.add('active');
   const chunk = currentChunks.find((c) => c.index === index);
   if (!chunk) return;
   const source = document.getElementById('source-text')!;
@@ -203,14 +204,24 @@ function highlightChunk(index: number): void {
     s.classList.remove('chunk-focus');
     for (let i = 0; i < 8; i += 1) s.classList.remove(`chunk-focus-${i}`);
   });
+  let firstFocused: Element | null = null;
   const spans = source.querySelectorAll('.source-segment');
   spans.forEach((span) => {
     const start = parseInt(span.getAttribute('data-start') ?? '0', 10);
     const end = parseInt(span.getAttribute('data-end') ?? '0', 10);
     if (chunk.startOffset < end && chunk.endOffset > start) {
       span.classList.add('chunk-focus', `chunk-focus-${index % 8}`);
+      if (!firstFocused) firstFocused = span;
     }
   });
+  // Scroll document to show highlighted region
+  if (firstFocused) {
+    (firstFocused as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  // Scroll chunk card into view in sidebar
+  if (activeCard) {
+    (activeCard as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
 }
 
 function renderSourceHighlight(): void {
@@ -257,14 +268,38 @@ function renderSourceHighlight(): void {
     const endsHere = currentChunks.filter((c) => c.endOffset === seg.end).map((c) => c.index + 1);
     if (startsHere.length) {
       span.classList.add('boundary-start');
-      span.title = `Start: ${startsHere.map((i) => `#${i}`).join(', ')}`;
     }
     if (endsHere.length) {
       span.classList.add('boundary-end');
-      const endText = `End: ${endsHere.map((i) => `#${i}`).join(', ')}`;
-      span.title = span.title ? `${span.title} | ${endText}` : endText;
+    }
+    // Build rich tooltip info
+    if (covering.length > 0) {
+      const parts: string[] = [];
+      parts.push(covering.length === 1 ? `Chunk #${covering[0] + 1}` : `Chunks ${covering.map((i) => `#${i + 1}`).join(', ')}`);
+      if (covering.length > 1) parts.push('(overlap)');
+      if (startsHere.length) parts.push(`| Start: ${startsHere.map((i) => `#${i}`).join(', ')}`);
+      if (endsHere.length) parts.push(`| End: ${endsHere.map((i) => `#${i}`).join(', ')}`);
+      span.setAttribute('data-tooltip', parts.join(' '));
     }
     span.textContent = currentText.slice(seg.start, seg.end);
+
+    // Bidirectional: hover on document highlights chunk card
+    if (covering.length > 0) {
+      span.style.cursor = 'pointer';
+      span.addEventListener('mouseenter', () => {
+        covering.forEach((ci) => {
+          document.querySelector(`.chunk-card[data-index="${ci}"]`)?.classList.add('hovered');
+        });
+      });
+      span.addEventListener('mouseleave', () => {
+        document.querySelectorAll('.chunk-card.hovered').forEach((el) => el.classList.remove('hovered'));
+      });
+      // Click on document text selects the first covering chunk
+      span.addEventListener('click', () => {
+        highlightChunk(covering[0]);
+      });
+    }
+
     container.appendChild(span);
   });
 }
