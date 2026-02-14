@@ -1,19 +1,43 @@
-# Chunking Visualization
+# AGENT.MD
 
-Visualize chunking strategies on a Markdown document (e.g. from the `data/` folder). Upload a .md file, select chunking algorithms from the [LanceDB chunking analysis](https://lancedb.com/blog/chunking-analysis-which-is-the-right-chunking-approach-for-your-language/), and see each chunk shown visually.
+Agent-facing implementation notes for this repo.  
+User-facing setup and product documentation lives in `README.md`.
 
-## Install & run
+## Scope
 
-### Frontend
+- Frontend visualizer: `src/`
+- Python API and chunking logic: `backend/`
+
+## Chunking methods (source of truth: backend dispatcher)
+
+- `character` -> `CharacterTextSplitter`
+- `recursive` -> `RecursiveCharacterTextSplitter`
+- `token` -> `TokenTextSplitter`
+- `semantic` -> sentence embeddings + similarity-threshold grouping
+- `clustering` -> sentence embeddings + KMeans clustering (contiguous output)
+- `llm` -> paragraph-based proxy for agent/LLM chunking
+
+See:
+- `backend/chunking/runner.py`
+- `backend/chunking/splitters.py`
+
+## Key files
+
+- API entrypoint: `backend/app.py`
+- Request/response and params schema: `backend/chunking/schemas.py`
+- Frontend chunking options/labels: `src/options.ts`
+- Frontend chunking API calls: `src/chunking/`
+
+## Local run commands
+
+Frontend:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Open the URL shown (e.g. http://localhost:5173).
-
-### Backend
+Backend:
 
 ```bash
 cd backend
@@ -21,4 +45,4 @@ uv sync
 uv run uvicorn app:app --reload --port 8000
 ```
 
-Frontend expects the API at http://localhost:8000.
+Default API URL expected by frontend: `http://localhost:8000`.

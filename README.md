@@ -2,6 +2,13 @@
 
 Visualize different chunking strategies on Markdown documents. Algorithms are based on the [LanceDB chunking analysis](https://lancedb.com/blog/chunking-analysis-which-is-the-right-chunking-approach-for-your-language/).
 
+This is the primary user-facing project documentation. Agent-oriented implementation notes are in `AGENT.MD`.
+
+## Sources
+
+- LanceDB: [Chunking analysis: which is the right chunking approach for your language?](https://lancedb.com/blog/chunking-analysis-which-is-the-right-chunking-approach-for-your-language/)
+- LanceDB: [Chunking techniques with LangChain and LlamaIndex](https://lancedb.com/blog/chunking-techniques-with-langchain-and-llamaindex/)
+
 ## Features
 
 - **Upload .md** – Upload any Markdown file to chunk and visualize.
@@ -10,8 +17,8 @@ Visualize different chunking strategies on Markdown documents. Algorithms are ba
   1. **CharacterTextSplitter** – Fixed character count.
   2. **RecursiveCharacterTextSplitter** – Splits on paragraphs → lines → sentences → words.
   3. **TokenTextSplitter** – Approximate token-based splitting.
-  4. **Semantic Chunking** – Sentence-boundary grouping (no embeddings in-browser).
-  5. **Clustering (CRAG-style)** – Paragraph-based grouping.
+  4. **Semantic Chunking** – Sentence embeddings + similarity threshold.
+  5. **Clustering (CRAG-style)** – Sentence embeddings + KMeans (contiguous output chunks).
   6. **LLM-based (Agent assisted)** – Paragraph-based proxy (real version would use an API).
 
 - **Per-algorithm params** – Chunk size, overlap, and limits where applicable.
@@ -62,3 +69,14 @@ npm run preview
 ## Data
 
 - Put your own `.md` files in `data/` and use **Upload .md** to open them, or use **Load sample** to use the bundled sample.
+
+## Additional methods from LanceDB LangChain/LlamaIndex article
+
+The second LanceDB article also covers chunking/parser approaches that are not implemented in this repo yet, including:
+
+- HTML/header-aware splitting
+- JSON-aware recursive splitting
+- Code-aware splitting
+- Markdown/HTML node parsers (LlamaIndex)
+- Sentence splitter (LlamaIndex)
+- Hierarchical node parser (LlamaIndex)
