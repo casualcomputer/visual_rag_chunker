@@ -187,9 +187,22 @@ function renderChunks(): void {
     list.appendChild(card);
   });
   const summary = document.getElementById('chunk-summary')!;
-  summary.textContent = currentChunks.length
-    ? `${currentChunks.length} chunk${currentChunks.length === 1 ? '' : 's'}`
-    : 'Load or upload a document and pick an algorithm.';
+  if (currentChunks.length && currentText) {
+    const coveredChars = new Set<number>();
+    currentChunks.forEach((c) => {
+      for (let i = c.startOffset; i < c.endOffset; i++) coveredChars.add(i);
+    });
+    const nonWhitespaceTotal = [...currentText].reduce((n, ch) => n + (ch.trim() ? 1 : 0), 0);
+    let nonWhitespaceCovered = 0;
+    for (let i = 0; i < currentText.length; i++) {
+      if (currentText[i].trim() && coveredChars.has(i)) nonWhitespaceCovered++;
+    }
+    const pct = nonWhitespaceTotal > 0 ? Math.round((nonWhitespaceCovered / nonWhitespaceTotal) * 100) : 100;
+    const coverageNote = pct < 100 ? ` · ${pct}% covered` : '';
+    summary.textContent = `${currentChunks.length} chunk${currentChunks.length === 1 ? '' : 's'}${coverageNote}`;
+  } else {
+    summary.textContent = 'Load or upload a document and pick an algorithm.';
+  }
 }
 
 function highlightChunk(index: number): void {
@@ -263,6 +276,13 @@ function renderSourceHighlight(): void {
       const baseChunkIndex = covering[0];
       span.classList.add(`chunk-bg-${baseChunkIndex % 8}`);
       span.setAttribute('data-chunks', covering.map((i) => `#${i + 1}`).join(', '));
+    } else {
+      // Mark uncovered text so users can see gaps
+      const segText = currentText.slice(seg.start, seg.end);
+      if (segText.trim().length > 0) {
+        span.classList.add('source-uncovered');
+        span.setAttribute('data-tooltip', 'Not covered by any chunk');
+      }
     }
     const startsHere = currentChunks.filter((c) => c.startOffset === seg.start).map((c) => c.index + 1);
     const endsHere = currentChunks.filter((c) => c.endOffset === seg.end).map((c) => c.index + 1);

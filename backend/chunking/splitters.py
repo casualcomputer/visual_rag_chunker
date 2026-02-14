@@ -324,11 +324,10 @@ def _find_chunk_offsets(
     """Find where a chunk's content appears in the original text.
 
     Handles cases where chunk_text has been transformed (e.g. ## headers
-    stripped by MarkdownElementNodeParser). Falls back to line-by-line
-    matching and expands to full line boundaries in the original text.
+    stripped by MarkdownElementNodeParser). Walks through all non-empty
+    lines sequentially to handle repeated lines (e.g. "Published: 17 May
+    2023" appearing multiple times in the same section).
     """
-    # Line-by-line matching: find first and last non-empty lines
-    # Always expand to line boundaries so stripped prefixes (## etc.) are included.
     lines = [l for l in chunk_text.split("\n") if l.strip()]
     if not lines:
         return search_from, search_from
@@ -343,14 +342,19 @@ def _find_chunk_offsets(
     while start > 0 and text[start - 1] != "\n":
         start -= 1
 
-    # Find the last content line
-    if len(lines) > 1:
-        last_pos = _find_line_in_text(text, lines[-1], first_pos)
-        if last_pos == -1:
-            last_pos = first_pos
-        end = last_pos + len(lines[-1].strip())
-    else:
-        end = first_pos + len(lines[0].strip())
+    # Walk through ALL lines in order to find the correct last position.
+    # This handles repeated lines by matching each at its sequential occurrence.
+    cursor = first_pos + len(lines[0].strip())
+    for line in lines[1:]:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        pos = text.find(stripped, cursor)
+        if pos == -1:
+            break
+        cursor = pos + len(stripped)
+
+    end = cursor
 
     # Expand end past trailing whitespace/newlines up to the next content
     while end < len(text) and text[end] in " \t":

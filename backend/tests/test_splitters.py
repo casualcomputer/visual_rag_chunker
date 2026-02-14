@@ -115,6 +115,18 @@ def assert_full_coverage(chunks: list[dict], text: str, tolerance: int = 5):
     )
 
 
+def _coverage_pct(chunks: list[dict], text: str) -> float:
+    """Return the percentage of non-whitespace characters covered by chunks."""
+    covered = set()
+    for c in chunks:
+        for j in range(c["startOffset"], c["endOffset"]):
+            covered.add(j)
+    text_chars = {i for i, ch in enumerate(text) if not ch.isspace()}
+    if not text_chars:
+        return 100.0
+    return round(len(text_chars & covered) / len(text_chars) * 100, 1)
+
+
 # ===========================================================================
 # 1. CharacterTextSplitter
 # ===========================================================================
@@ -125,6 +137,10 @@ class TestCharacterSplit:
         assert_valid_chunks(chunks, SAMPLE_TEXT)
         assert_offsets_ordered(chunks)
         assert len(chunks) > 1
+
+    def test_full_coverage(self):
+        chunks = character_split(SAMPLE_TEXT, default_params(character_size=200, character_overlap=20))
+        assert_full_coverage(chunks, SAMPLE_TEXT)
 
     def test_smaller_chunk_size_yields_more_chunks(self):
         big = character_split(SAMPLE_TEXT, default_params(character_size=500, character_overlap=0))
@@ -148,6 +164,10 @@ class TestRecursiveSplit:
         assert_valid_chunks(chunks, SAMPLE_TEXT)
         assert_offsets_ordered(chunks)
         assert len(chunks) > 1
+
+    def test_full_coverage(self):
+        chunks = recursive_split(SAMPLE_TEXT, default_params(recursive_size=200, recursive_overlap=20))
+        assert_full_coverage(chunks, SAMPLE_TEXT)
 
     def test_smaller_yields_more(self):
         big = recursive_split(SAMPLE_TEXT, default_params(recursive_size=500, recursive_overlap=0))
@@ -174,6 +194,10 @@ class TestTokenSplit:
         assert_offsets_ordered(chunks)
         assert len(chunks) > 1
 
+    def test_full_coverage(self):
+        chunks = token_split(SAMPLE_TEXT, default_params(token_size=50, token_overlap=5))
+        assert_full_coverage(chunks, SAMPLE_TEXT)
+
     def test_smaller_yields_more(self):
         big = token_split(SAMPLE_TEXT, default_params(token_size=200, token_overlap=0))
         small = token_split(SAMPLE_TEXT, default_params(token_size=50, token_overlap=0))
@@ -191,6 +215,10 @@ class TestSemanticSplit:
         assert_valid_chunks(chunks, SAMPLE_TEXT)
         assert_offsets_ordered(chunks)
         assert len(chunks) >= 1
+
+    def test_full_coverage(self):
+        chunks = semantic_split(SAMPLE_TEXT, default_params(semantic_percentile=80))
+        assert_full_coverage(chunks, SAMPLE_TEXT)
 
     def test_higher_percentile_fewer_breaks(self):
         """Higher percentile = fewer break points = fewer (or equal) chunks."""
@@ -227,6 +255,10 @@ class TestClusteringSplit:
         assert_offsets_ordered(chunks)
         assert len(chunks) >= 2
 
+    def test_full_coverage(self):
+        chunks = clustering_split(SAMPLE_TEXT, default_params())
+        assert_full_coverage(chunks, SAMPLE_TEXT)
+
     def test_explicit_num_clusters(self):
         chunks = clustering_split(SAMPLE_TEXT, default_params(num_clusters=3))
         assert_valid_chunks(chunks, SAMPLE_TEXT)
@@ -255,6 +287,10 @@ class TestLlmSplit:
         assert_valid_chunks(chunks, SAMPLE_TEXT)
         assert_offsets_ordered(chunks)
         assert len(chunks) > 1
+
+    def test_full_coverage(self):
+        chunks = llm_split(SAMPLE_TEXT, default_params(llm_max=200))
+        assert_full_coverage(chunks, SAMPLE_TEXT)
 
     def test_large_max_single_chunk(self):
         chunks = llm_split(SAMPLE_TEXT, default_params(llm_max=10000))
@@ -313,6 +349,10 @@ class TestCodeSplit:
         chunks = code_split(SAMPLE_TEXT, default_params(code_chunk_size=200, code_chunk_overlap=20))
         assert_valid_chunks(chunks, SAMPLE_TEXT)
         assert_offsets_ordered(chunks)
+
+    def test_full_coverage(self):
+        chunks = code_split(SAMPLE_TEXT, default_params(code_chunk_size=200, code_chunk_overlap=20))
+        assert_full_coverage(chunks, SAMPLE_TEXT)
 
     def test_smaller_yields_more(self):
         big = code_split(SAMPLE_TEXT, default_params(code_chunk_size=500, code_chunk_overlap=0))
@@ -381,6 +421,10 @@ class TestLlamaSentenceSplit:
         assert_valid_chunks(chunks, SAMPLE_TEXT)
         assert len(chunks) > 1
 
+    def test_full_coverage(self):
+        chunks = llama_sentence_split(SAMPLE_TEXT, default_params(llama_sentence_size=100, llama_sentence_overlap=10))
+        assert_full_coverage(chunks, SAMPLE_TEXT)
+
     def test_smaller_yields_more(self):
         big = llama_sentence_split(SAMPLE_TEXT, default_params(llama_sentence_size=1024, llama_sentence_overlap=0))
         small = llama_sentence_split(SAMPLE_TEXT, default_params(llama_sentence_size=100, llama_sentence_overlap=0))
@@ -415,6 +459,17 @@ class TestLlamaHierarchicalSplit:
         assert_valid_chunks(chunks, SAMPLE_TEXT)
         assert len(chunks) >= 1
 
+    def test_full_coverage(self):
+        chunks = llama_hierarchical_split(
+            SAMPLE_TEXT,
+            default_params(
+                llama_hierarchical_large=512,
+                llama_hierarchical_medium=256,
+                llama_hierarchical_small=128,
+            ),
+        )
+        assert_full_coverage(chunks, SAMPLE_TEXT)
+
     def test_returns_leaf_nodes(self):
         """Blog says we return leaf (smallest) nodes."""
         chunks = llama_hierarchical_split(
@@ -444,6 +499,51 @@ class TestLlamaMarkdownElementSplit:
         md_with_table = "# Section\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\nSome prose.\n"
         chunks = element_split(md_with_table, default_params())
         assert any("|" in c["text"] for c in chunks), "Table should appear as a chunk"
+
+    def test_full_coverage(self):
+        """Element parser should achieve full coverage with normalized offset matching."""
+        chunks = element_split(SAMPLE_TEXT, default_params())
+        assert_full_coverage(chunks, SAMPLE_TEXT)
+
+    def test_full_coverage_with_comments(self):
+        """Ensure HTML comments don't cause gaps."""
+        md = "# Section\n\n<!-- image -->\n\nSome text.\n\n## Section 2\n\nMore text.\n"
+        chunks = element_split(md, default_params())
+        assert_full_coverage(chunks, md)
+
+    def test_full_coverage_with_repeated_lines(self):
+        """Repeated lines (e.g. timestamps) must not cause early cutoff."""
+        md = (
+            "## Section A\n\n"
+            "Para 1.\n\nPublished: 17 May 2023\n\n"
+            "<!-- image -->\n\n"
+            "Para 2.\n\nPublished: 17 May 2023\n\n"
+            "## Section B\n\nPara 3.\n"
+        )
+        chunks = element_split(md, default_params())
+        assert_full_coverage(chunks, md)
+
+
+# ===========================================================================
+# 17. Markdown Header Split – full coverage
+# ===========================================================================
+
+class TestMarkdownHeaderSplitCoverage:
+    def test_full_coverage(self):
+        """Markdown header splitter should achieve full coverage after normalization fix."""
+        chunks = markdown_header_split(SAMPLE_TEXT, default_params())
+        assert_full_coverage(chunks, SAMPLE_TEXT)
+
+    def test_full_coverage_with_repeated_lines(self):
+        """Repeated lines (e.g. timestamps) must not cause early cutoff."""
+        md = (
+            "## Section A\n\n"
+            "Para 1.\n\nPublished: 17 May 2023\n\n"
+            "Para 2.\n\nPublished: 17 May 2023\n\n"
+            "## Section B\n\nPara 3.\n"
+        )
+        chunks = markdown_header_split(md, default_params())
+        assert_full_coverage(chunks, md)
 
 
 # ===========================================================================

@@ -88,6 +88,58 @@ class ChunkingParams:
         )
 
 
+def _find_normalized(text: str, chunk_text: str, search_from: int) -> tuple[int, int]:
+    """Find chunk_text in text, tolerating whitespace normalization.
+
+    Some splitters (e.g. MarkdownHeaderTextSplitter) transform the text:
+    - ``\\n\\n`` becomes ``  \\n`` (markdown line-break)
+    - leading/trailing whitespace may be added or removed
+
+    This function walks through every non-empty line of chunk_text in order,
+    finding each one sequentially in the original text.  This handles
+    repeated lines (e.g. "Published: 17 May 2023" appearing multiple times
+    in the same section).  Returns (start, end) offsets into the original
+    text, or (-1, -1) if the first line is not found.
+    """
+    lines = [l.strip() for l in chunk_text.split("\n") if l.strip()]
+    if not lines:
+        return -1, -1
+
+    first_pos = text.find(lines[0], search_from)
+    if first_pos == -1:
+        return -1, -1
+
+    # Expand start to line boundary
+    start = first_pos
+    while start > 0 and text[start - 1] != "\n":
+        start -= 1
+
+    # Walk through all lines in order to find the correct last position.
+    # This ensures repeated lines (like "Published: 17 May 2023") are
+    # matched at their correct sequential occurrence.
+    cursor = first_pos
+    last_match_end = first_pos + len(lines[0])
+    for line in lines[1:]:
+        pos = text.find(line, cursor)
+        if pos == -1:
+            break
+        cursor = pos + len(line)
+        last_match_end = cursor
+
+    end = last_match_end
+
+    # Expand end past trailing whitespace up to the next non-blank line
+    while end < len(text) and text[end] in " \t":
+        end += 1
+    # Consume trailing newlines (up to double-newline paragraph break)
+    newlines = 0
+    while end < len(text) and text[end] == "\n" and newlines < 2:
+        end += 1
+        newlines += 1
+
+    return start, end
+
+
 def chunks_with_offsets(text: str, chunk_texts: list[str]) -> list[dict]:
     """Compute startOffset/endOffset for each chunk by finding it in the original text."""
     result = []
@@ -104,15 +156,32 @@ def chunks_with_offsets(text: str, chunk_texts: list[str]) -> list[dict]:
         idx = text.find(chunk_text, search_start)
         if idx == -1:
             idx = text.find(chunk_text, prev_start)
-        if idx == -1:
-            # Fallback: treat as contiguous (e.g. normalized whitespace)
-            idx = prev_end
+
+        if idx != -1:
+            # Exact match found
+            start = idx
+            end = idx + len(chunk_text)
+        else:
+            # Whitespace-normalized match (e.g. MarkdownHeaderTextSplitter
+            # converts \n\n to "  \n")
+            start, end = _find_normalized(text, chunk_text, prev_end)
+            if start == -1:
+                start, end = _find_normalized(text, chunk_text, prev_start)
+            if start == -1:
+                # Last resort fallback
+                start = prev_end
+                end = prev_end + len(chunk_text)
+
+        # Use the original text at the matched offsets so display preserves
+        # the actual document formatting.
+        display_text = text[start:end].strip() if end <= len(text) else chunk_text
+
         result.append({
             "index": i,
-            "text": chunk_text,
-            "startOffset": idx,
-            "endOffset": idx + len(chunk_text),
+            "text": display_text,
+            "startOffset": start,
+            "endOffset": end,
         })
-        prev_start = idx
-        prev_end = idx + len(chunk_text)
+        prev_start = start
+        prev_end = end
     return result
