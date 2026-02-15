@@ -310,61 +310,6 @@ def _llama_nodes_to_chunks(text: str, nodes: list) -> list[dict]:
     return chunks_with_offsets(text, chunk_texts)
 
 
-def _find_line_in_text(text: str, line: str, search_from: int) -> int:
-    """Find a line in text, returning its start position or -1."""
-    stripped = line.strip()
-    if not stripped:
-        return -1
-    return text.find(stripped, search_from)
-
-
-def _find_chunk_offsets(
-    text: str, chunk_text: str, search_from: int
-) -> tuple[int, int]:
-    """Find where a chunk's content appears in the original text.
-
-    Handles cases where chunk_text has been transformed (e.g. ## headers
-    stripped by MarkdownElementNodeParser). Walks through all non-empty
-    lines sequentially to handle repeated lines (e.g. "Published: 17 May
-    2023" appearing multiple times in the same section).
-    """
-    lines = [l for l in chunk_text.split("\n") if l.strip()]
-    if not lines:
-        return search_from, search_from
-
-    # Find the first content line in original text
-    first_pos = _find_line_in_text(text, lines[0], search_from)
-    if first_pos == -1:
-        return search_from, search_from + len(chunk_text)
-
-    # Expand start to the beginning of that line (to include ## prefix etc.)
-    start = first_pos
-    while start > 0 and text[start - 1] != "\n":
-        start -= 1
-
-    # Walk through ALL lines in order to find the correct last position.
-    # This handles repeated lines by matching each at its sequential occurrence.
-    cursor = first_pos + len(lines[0].strip())
-    for line in lines[1:]:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        pos = text.find(stripped, cursor)
-        if pos == -1:
-            break
-        cursor = pos + len(stripped)
-
-    end = cursor
-
-    # Expand end past trailing whitespace/newlines up to the next content
-    while end < len(text) and text[end] in " \t":
-        end += 1
-    if end < len(text) and text[end] == "\n":
-        end += 1
-
-    return start, end
-
-
 def element_split(text: str, params: ChunkingParams) -> list[dict]:
     """LlamaIndex MarkdownElementNodeParser: keeps tables/lists/code blocks intact.
 
@@ -415,7 +360,44 @@ def element_split(text: str, params: ChunkingParams) -> list[dict]:
             if not chunk_text:
                 continue
 
-            start, end = _find_chunk_offsets(text, chunk_text, el_cursor)
+            # --- Find where this chunk lives in the original text ---
+            # Handles transformed text (e.g. ## headers stripped by
+            # MarkdownElementNodeParser). Walks non-empty lines sequentially
+            # to handle repeated lines at their correct occurrence.
+            lines = [l for l in chunk_text.split("\n") if l.strip()]
+            if not lines:
+                start, end = el_cursor, el_cursor
+            else:
+                # Find the first content line in original text
+                first_stripped = lines[0].strip()
+                first_pos = text.find(first_stripped, el_cursor) if first_stripped else -1
+
+                if first_pos == -1:
+                    start, end = el_cursor, el_cursor + len(chunk_text)
+                else:
+                    # Expand start to beginning of that line (to include ## prefix etc.)
+                    start = first_pos
+                    while start > 0 and text[start - 1] != "\n":
+                        start -= 1
+
+                    # Walk through ALL lines to find the correct last position
+                    cursor = first_pos + len(first_stripped)
+                    for line in lines[1:]:
+                        stripped = line.strip()
+                        if not stripped:
+                            continue
+                        pos = text.find(stripped, cursor)
+                        if pos == -1:
+                            break
+                        cursor = pos + len(stripped)
+
+                    end = cursor
+
+                    # Expand end past trailing whitespace/newlines
+                    while end < len(text) and text[end] in " \t":
+                        end += 1
+                    if end < len(text) and text[end] == "\n":
+                        end += 1
 
             # Use the original text at the computed offsets so that
             # markdown formatting (## headers etc.) is preserved in display.
