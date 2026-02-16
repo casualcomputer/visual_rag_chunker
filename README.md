@@ -35,10 +35,16 @@ This is the primary user-facing project documentation. Agent-oriented implementa
 
 ## Setup
 
+### Prerequisites
+
+- Node.js `20.x` (see `.nvmrc`)
+- Python `3.11.x` for backend (see `backend/.python-version`)
+- `uv` installed: https://docs.astral.sh/uv/
+
 **Frontend**
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -50,14 +56,14 @@ Chunking runs in Python as in the [LanceDB blog](https://lancedb.com/blog/chunki
 
 ```bash
 cd backend
-uv sync
+uv sync --frozen
 ```
 
 Or with uv’s pip interface:
 
 ```bash
 cd backend
-uv pip install -r requirements.txt
+uv pip install -r requirements.txt  # fallback path (not lockfile-based)
 ```
 
 Then start the API:

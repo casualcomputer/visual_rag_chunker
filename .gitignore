@@ -2,3 +2,9 @@ node_modules/
 dist/
 data/private/
 code_playground/
+.DS_Store
+.venv/
+backend/.venv/
+backend/.nltk_data/
+__pycache__/
+*.py[cod]

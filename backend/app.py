@@ -2,7 +2,7 @@
 FastAPI backend for chunking visualization.
 Chunking algorithms implemented as in the LanceDB blog.
 """
-import os
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,13 +11,20 @@ from pydantic import BaseModel
 from chunking import run_chunking
 from chunking.schemas import ChunkingParams
 
-# Ensure NLTK data is available
+# Keep NLTK assets in-project so setup is reproducible across machines.
+NLTK_DATA_DIR = Path(__file__).resolve().parent / ".nltk_data"
+
+
 def _ensure_nltk():
+    import nltk
+
+    nltk.data.path.insert(0, str(NLTK_DATA_DIR))
     try:
-        import nltk
         nltk.data.find("tokenizers/punkt_tab")
     except LookupError:
-        nltk.download("punkt_tab", quiet=True)
+        NLTK_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        nltk.download("punkt_tab", download_dir=str(NLTK_DATA_DIR), quiet=True)
+        nltk.data.find("tokenizers/punkt_tab")
 
 
 app = FastAPI(title="Chunking Visualization API")
