@@ -192,7 +192,7 @@ function renderApiWarning(): void {
 function renderChunks(): void {
   const list = document.getElementById('chunk-list')!;
   list.innerHTML = '';
-  currentChunks.forEach((chunk) => {
+  currentChunks.forEach((chunk, idx) => {
     const card = document.createElement('div');
     card.className = `chunk-card chunk-card-color-${chunk.index % 8}`;
     card.dataset.index = String(chunk.index);
@@ -201,10 +201,20 @@ function renderChunks(): void {
     title.textContent = `Chunk ${chunk.index + 1}`;
     const meta = document.createElement('div');
     meta.className = 'chunk-meta';
-    meta.textContent = `${chunk.text.length} chars · offset ${chunk.startOffset}–${chunk.endOffset}`;
+    const next = currentChunks[idx + 1];
+    const overlapWithNext = next ? Math.max(0, chunk.endOffset - next.startOffset) : 0;
+    const overlapNote = overlapWithNext > 0 ? ` · overlaps next by ${overlapWithNext} chars` : '';
+    meta.textContent = `${chunk.text.length} chars · offset ${chunk.startOffset}–${chunk.endOffset}${overlapNote}`;
     const body = document.createElement('pre');
     body.className = 'chunk-body';
-    body.textContent = chunk.text.slice(0, 400) + (chunk.text.length > 400 ? '…' : '');
+    let previewText = chunk.text;
+    if (chunk.text.length > 400) {
+      const head = chunk.text.slice(0, 220);
+      const tail = chunk.text.slice(-140);
+      const omitted = chunk.text.length - head.length - tail.length;
+      previewText = `${head}\n\n... [${omitted} chars omitted in middle] ...\n\n${tail}`;
+    }
+    body.textContent = `[[UI preview: chunk start]]\n${previewText}\n[[UI preview: chunk end]]`;
     card.appendChild(title);
     card.appendChild(meta);
     card.appendChild(body);
