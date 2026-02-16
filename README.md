@@ -32,6 +32,7 @@ This is the primary user-facing project documentation. Agent-oriented implementa
 
 - **Per-algorithm params** – Chunk size, overlap, and limits where applicable.
 - **Visual chunks** – Chunks listed as cards; click a chunk to highlight its region in the document.
+- **HTML safety fallback** – If an HTML-only splitter is selected for non-HTML input, the API applies a markdown fallback and returns a warning shown in the UI.
 
 ## Setup
 

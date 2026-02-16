@@ -3,6 +3,7 @@ FastAPI backend for chunking visualization.
 Chunking algorithms implemented as in the LanceDB blog.
 """
 from pathlib import Path
+import re
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -50,6 +51,18 @@ class ChunkRequest(BaseModel):
 
 class ChunkResponse(BaseModel):
     chunks: list[dict]
+    warning: str | None = None
+
+
+HTML_ONLY_FALLBACKS = {
+    "htmlHeader": "markdownHeader",
+    "llamaHtmlNode": "llamaMarkdownNode",
+}
+
+
+def _looks_like_html(text: str) -> bool:
+    # A simple, robust check for actual HTML tags.
+    return bool(re.search(r"<\s*/?\s*[a-zA-Z][a-zA-Z0-9:-]*\b[^>]*>", text))
 
 
 @app.on_event("startup")
@@ -63,8 +76,19 @@ def chunk_text(req: ChunkRequest):
         return ChunkResponse(chunks=[])
     params = ChunkingParams.from_request(req.params or {})
     try:
-        chunks = run_chunking(req.algorithm, req.text, params)
-        return ChunkResponse(chunks=chunks)
+        algorithm = req.algorithm
+        warning: str | None = None
+
+        fallback_algorithm = HTML_ONLY_FALLBACKS.get(algorithm)
+        if fallback_algorithm and not _looks_like_html(req.text):
+            warning = (
+                f"Selected algorithm '{algorithm}' expects HTML input. "
+                f"Applied fallback '{fallback_algorithm}' for this document."
+            )
+            algorithm = fallback_algorithm
+
+        chunks = run_chunking(algorithm, req.text, params)
+        return ChunkResponse(chunks=chunks, warning=warning)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

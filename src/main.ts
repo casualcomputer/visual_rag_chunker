@@ -15,6 +15,7 @@ let activeChunkIndex: number | null = null;
 let isDocumentCompact = true;
 const params: ChunkingParams = {};
 let apiError: string | null = null;
+let apiWarning: string | null = null;
 let chunkRequestSeq = 0;
 let inFlightChunkRequest: AbortController | null = null;
 
@@ -94,14 +95,18 @@ async function updateChunks(): Promise<void> {
     setChunkingState(false);
     currentChunks = [];
     apiError = null;
+    apiWarning = null;
     renderChunks();
     renderSourceHighlight();
     renderApiError();
+    renderApiWarning();
     return;
   }
   setChunkingState(true);
   apiError = null;
+  apiWarning = null;
   renderApiError();
+  renderApiWarning();
   try {
     const reqParams: Record<string, number> = {};
     CHUNKING_OPTIONS.find((o) => o.id === currentAlgorithmId)?.params?.forEach((p) => {
@@ -126,10 +131,12 @@ async function updateChunks(): Promise<void> {
     const data = await res.json();
     if (requestSeq !== chunkRequestSeq) return;
     currentChunks = Array.isArray(data.chunks) ? data.chunks : [];
+    apiWarning = typeof data.warning === 'string' && data.warning.trim() ? data.warning : null;
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') return;
     if (requestSeq !== chunkRequestSeq) return;
     apiError = e instanceof Error ? e.message : 'Backend unavailable. Start the Python server (see README).';
+    apiWarning = null;
     currentChunks = [];
   } finally {
     if (requestSeq === chunkRequestSeq && inFlightChunkRequest === controller) {
@@ -145,6 +152,7 @@ async function updateChunks(): Promise<void> {
     highlightChunk(activeChunkIndex);
   }
   renderApiError();
+  renderApiWarning();
 }
 
 function renderApiError(): void {
@@ -161,6 +169,23 @@ function renderApiError(): void {
   } else if (banner) {
     banner.classList.remove('visible');
       banner.textContent = '';
+  }
+}
+
+function renderApiWarning(): void {
+  let banner = document.getElementById('api-warning-banner');
+  if (apiWarning) {
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'api-warning-banner';
+      banner.className = 'api-warning-banner';
+      app.querySelector('.controls')?.after(banner);
+    }
+    banner.textContent = apiWarning;
+    banner.classList.add('visible');
+  } else if (banner) {
+    banner.classList.remove('visible');
+    banner.textContent = '';
   }
 }
 
@@ -240,7 +265,7 @@ function highlightChunk(index: number): void {
 function renderSourceHighlight(): void {
   const container = document.getElementById('source-text')!;
   if (!currentText) {
-    container.innerHTML = '<p class="placeholder">Upload a .md file or load the sample.</p>';
+    container.innerHTML = '<p class="placeholder">Upload a document (.md/.html) or load the sample.</p>';
     return;
   }
   container.innerHTML = '';
@@ -339,8 +364,8 @@ function init(): void {
     <div class="controls">
       <div class="upload-row">
         <label class="btn btn-primary">
-          <input type="file" id="file-input" accept=".md,text/markdown,text/plain" hidden />
-          Upload .md
+          <input type="file" id="file-input" accept=".md,.html,.htm,text/markdown,text/plain,text/html" hidden />
+          Upload document (.md/.html)
         </label>
         <button type="button" id="load-sample" class="btn btn-secondary">Load sample</button>
       </div>
@@ -361,7 +386,7 @@ function init(): void {
           <h2>Document</h2>
           <button type="button" id="toggle-document-size" class="btn btn-ghost">Expand document</button>
         </div>
-        <div id="source-text" class="source-text"><p class="placeholder">Upload a .md file or load the sample.</p></div>
+        <div id="source-text" class="source-text"><p class="placeholder">Upload a document (.md/.html) or load the sample.</p></div>
       </main>
     </div>
   `;
